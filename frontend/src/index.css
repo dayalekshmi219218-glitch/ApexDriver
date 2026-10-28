@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+@layer base {
+  html { color-scheme: light; scroll-behavior: smooth; }
+  html.dark { color-scheme: dark; }
+  body {
+    @apply bg-bg font-sans text-ink antialiased;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(60rem 36rem at 8% -12%, rgb(var(--primary) / 0.13), transparent 60%),
+      radial-gradient(48rem 30rem at 100% 108%, rgb(var(--accent) / 0.10), transparent 60%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3 { @apply font-display tracking-tight; }
+  :focus-visible { outline: 2px solid rgb(var(--primary)); outline-offset: 2px; border-radius: 6px; }
+  ::selection { background: rgb(var(--primary) / 0.28); }
+}
+
+@layer components {
+  .card { @apply rounded-2xl border border-border bg-surface/90 shadow-card backdrop-blur; }
+  .label { @apply text-xs font-medium uppercase tracking-wider text-muted; }
+  .skeleton { @apply relative overflow-hidden rounded-lg bg-surface3; }
+  .skeleton::after {
+    content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(var(--text) / 0.07), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
