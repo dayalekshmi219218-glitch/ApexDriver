@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../services/api';
 import type { Scan, Settings, User, Vehicle } from '../lib/types';
@@ -90,7 +91,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Store>(() => ({
     ready, user, vehicles, scans, settings, toasts, notify,
     setSettings: (patch) => setSettingsState((s) => ({ ...s, ...patch })),
-    signInGoogle: async () => { setUser(await api.signInWithGoogle()); await refresh(); },
+    signInGoogle: async () => {try {
+    const u = await api.signInWithGoogle();
+    setUser(u);
+    await refresh();
+  } catch (e) {
+    // The OAuth call always "fails" with a redirect error by design.
+    // If it's a real error (network, config), the caller's toast will surface it.
+    if (!(e instanceof Error) || !e.message.includes('Redirecting')) {
+      throw e;
+    }
+  } },
     signInDemo: async () => { setUser(await api.signInDemo()); await refresh(); },
     signOut: async () => { await api.signOut(); setUser(null); setVehicles([]); setScans([]); },
     addVehicle: async (name, year) => { const v = await api.createVehicle({ name, modelYear: year }); await refresh(); return v; },
@@ -101,6 +112,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     loadDemo: async () => { await api.loadDemoData(); await refresh(); },
     wipe: async () => { await api.deleteAllData(); await refresh(); },
   }), [ready, user, vehicles, scans, settings, toasts, notify, refresh]);
+      useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        const u = await api.getSession();
+        setUser(u);
+        if (u) await refresh();
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setVehicles([]);
+        setScans([]);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

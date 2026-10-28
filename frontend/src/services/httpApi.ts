@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase';
 import { detectAnomalies } from '../lib/anomaly';
 import { buildChartExplanation, buildExplanation } from '../lib/explain';
 import { seedDemo } from '../lib/synth';
@@ -55,12 +56,29 @@ async function loadAllScans(): Promise<Scan[]> {
 
 export const httpApi: Api = {
   async getSession() {
-    return readUser();
+     const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
+    const u = session.user;
+    const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+    return {
+      id: u.id,
+      name: (meta.full_name as string) || (meta.name as string) || u.email || 'Driver',
+      email: u.email ?? '',
+      demo: false,
+    };
   },
   async signInWithGoogle() {
-    const u: User = { id: 'u-google', name: 'Alex Driver', email: 'alex.driver@example.com', demo: false };
-    localStorage.setItem(USER_KEY, JSON.stringify(u));
-    return u;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        scopes: 'https://www.googleapis.com/auth/userinfo.email',
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+    if (error) throw new Error(error.message);
+    // The browser is redirecting to Google. Never returns a real user.
+    // StoreProvider will call getSession() again on the return page load.
+    throw new Error('Redirecting to Google…');
   },
   async signInDemo() {
     const u: User = { id: 'u-demo', name: 'Demo user', email: 'demo@apexdriver.app', demo: true };
@@ -69,6 +87,7 @@ export const httpApi: Api = {
     return u;
   },
   async signOut() {
+    await supabase.auth.signOut();
     localStorage.removeItem(USER_KEY);
   },
   listVehicles: () => request<Vehicle[]>('/vehicles'),

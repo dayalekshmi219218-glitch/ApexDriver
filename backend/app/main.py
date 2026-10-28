@@ -41,7 +41,6 @@ class VehicleIn(BaseModel):
             raise ValueError(f"Model year must be between 1980 and {MAX_YEAR}, or left empty.")
         return v
 
-
 class CanonicalImport(BaseModel):
     vehicleId: str
     series: dict[str, list[Optional[float]]]
@@ -64,7 +63,6 @@ class CanonicalImport(BaseModel):
             raise ValueError("All signals must have the same length, between 1 and 200000 samples.")
         return v
 
-
 def current_user(request: Request, x_dev_user: Annotated[Optional[str], Header()] = None) -> str:
     """DEV ONLY (slice 2): the caller names itself in X-Dev-User. Slice 3 replaces this with Supabase token verification."""
     if not request.app.state.settings.dev_auth:
@@ -74,17 +72,14 @@ def current_user(request: Request, x_dev_user: Annotated[Optional[str], Header()
         raise HTTPException(400, "Invalid X-Dev-User header.")
     return uid
 
-
 User = Annotated[str, Depends(current_user)]
-
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
     settings = settings or Settings()
-    store = Store(settings.data_dir)
+    store = Store(settings.data_dir, database_url=settings.supabase_db_url or None)
     app = FastAPI(title="ApexDriver API", version=VERSION)
     app.state.store, app.state.settings = store, settings
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"], allow_headers=["*"])
-
 
     def vehicle_or_404(user: str, vid: str) -> dict:
         v = store.get_vehicle(user, vid)
@@ -95,9 +90,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def scan_json(row: Any) -> dict:
         if row["status"] == "ready" and row["result_json"]:
             return {**json.loads(row["result_json"]), "status": "ready"}
-        return {"id": row["id"], "vehicleId": row["vehicle_id"], "fileName": row["file_name"], "status": row["status"],
-                "error": row["error"]}
-
+        return {"id": row["id"], "vehicleId": row["vehicle_id"], "fileName": row["file_name"], "status": row["status"],"error": row["error"]}            
     @app.get("/health")
     def health() -> dict:
         return {"status": "ok", "version": VERSION}
